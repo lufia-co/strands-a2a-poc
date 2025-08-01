@@ -1,2 +1,6 @@
 bedrock-agentcore
 strands-agents
+strands-agents[anthropic]
+strands-agents-tools[a2a_client]
+uvicorn
+python-dotenv

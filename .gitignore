@@ -1,2 +1,5 @@
 .env
-.vscode
+.vscode/
+*test*.json
+.venv
+logs/
