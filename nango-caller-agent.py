@@ -1,6 +1,38 @@
 import logging
 import os
 from dotenv import load_dotenv
+
+# This runtime patch is needed as workaround until is fixed by -> https://github.com/strands-agents/sdk-python/issues/589
+# ------- # ------- # ------- # ------- # -------
+import strands.multiagent.a2a.executor as executor_module
+from strands.multiagent.a2a.executor import StrandsA2AExecutor
+from a2a.server.tasks import TaskUpdater
+
+# Patch the execute method to fix the contextId/context_id issue
+original_execute = StrandsA2AExecutor.execute
+
+async def patched_execute(self, context, event_queue):
+    """Patched execute method that fixes the contextId attribute error."""
+    task = context.current_task
+    if not task:
+        from a2a.utils import new_task
+        task = new_task(context.message)
+        await event_queue.enqueue_event(task)
+
+    # Fix: use context_id instead of contextId
+    updater = TaskUpdater(event_queue, task.id, task.context_id)
+
+    try:
+        await self._execute_streaming(context, updater)
+    except Exception as e:
+        from a2a.types import InternalError
+        from a2a.utils.errors import ServerError
+        raise ServerError(error=InternalError()) from e
+
+# Apply the patch
+StrandsA2AExecutor.execute = patched_execute
+# ------- # ------- # ------- # ------- # -------
+
 from strands import Agent
 from strands.tools.mcp import MCPClient
 from strands.multiagent.a2a import A2AServer
