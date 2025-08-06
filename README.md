@@ -108,50 +108,6 @@ curl http://localhost:8081/
   "status": "success"
 }
 ```
-
-## Agent Configuration
-
-### Dynamic Agent Factory (Work in Progress)
-
-The `dinamic_agent.py` module is under development and will provide a flexible system for creating and managing agents with different configurations. This feature is not yet ready for production use.
-
-## Docker Deployment
-
-### Build and Run the Calendar Agent
-
-```bash
-docker build -f dockerfile.nango -t calendar-agent .
-docker run -p 8080:8080 --env-file .env calendar-agent
-```
-
-### Multi-Container Setup
-
-For production deployment, consider using Docker Compose to orchestrate both services:
-
-```yaml
-version: '3.8'
-services:
-  calendar-agent:
-    build:
-      context: .
-      dockerfile: dockerfile.nango
-    ports:
-      - "8080:8080"
-    env_file:
-      - .env
-    
-  qa-api:
-    build: .
-    ports:
-      - "8081:8081"
-    env_file:
-      - .env
-    depends_on:
-      - calendar-agent
-    environment:
-      - CALENDAR_AGENT_URL=http://calendar-agent:8080
-```
-
 ## Key Components
 
 ### A2AClientToolProvider
