@@ -77,10 +77,11 @@ google_calendar_agent = Agent(
     If none of the tools can help you, inform the user that you cannot help with that.
     
     Important:
-    1. The default location for timezone is Sao Paulo, Brazil.
-    1.1. If the user does not specify a timezone, you can assume it's Sao Paulo.
-    2. If any exception happens, just inform the user you're not being able to retrieve data due to internal problems.
-    3. You can use current_time tool to clarify and define which day is today.
+    - The default location for timezone is Sao Paulo, Brazil.
+    - If the user does not specify a timezone, you can assume it's Sao Paulo.
+    - If any exception happens, just inform the user you're not being able to retrieve data due to internal problems.
+    - Forward the connection_id to nango_mcp_calendar_tools.
+    - If no connection_id is provided, inform that you cannot perform the operation and ask the user to inform the connection_id.
 
     Always answer with a JSON object
     DO NOT use emojis in the answers
@@ -90,7 +91,8 @@ google_calendar_agent = Agent(
 )
 
 print("Creating A2A Server...")
-server = A2AServer(agent=google_calendar_agent, serve_at_root=True, http_url="https://nango-caller-agent-931384239836.us-east1.run.app")
+server_url = os.getenv("SERVER_URL") # Ensure this is set in your environment so load_balancer, cloud_run, or other services can access it.
+server = A2AServer(agent=google_calendar_agent, serve_at_root=True, http_url=server_url)
 
 print("Converting A2A Server to FastAPI app...")
 fastapi_app = server.to_fastapi_app()

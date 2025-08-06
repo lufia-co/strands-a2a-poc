@@ -47,7 +47,7 @@ agent = Agent(
 
 class InvocationRequest(BaseModel):
     input: str
-    
+
 class InvocationResponse(BaseModel):
     response: Any
     status: str = "success"
@@ -76,7 +76,7 @@ async def invocation(request: InvocationRequest):
             try:
                 resp = invoke_agent(request.input)
                 trace.update_trace(
-                    output=json.dumps(resp) if resp else "No response",
+                    output=resp if resp else "No response",
                     tags=["multi-agent-invocation"]
                 )
                 return InvocationResponse(response=resp)
@@ -84,7 +84,7 @@ async def invocation(request: InvocationRequest):
                 print(f"Error invoking Q&A agent: {e}")
                 trace.update(level="ERROR")
                 trace.update_trace(
-                    output=json.dumps({"error": str(e)}),
+                    output=str(e),
                     tags=["multi-agent-invocation", "error"]
                 )
                 raise HTTPException(status_code=500, detail=str(e))
