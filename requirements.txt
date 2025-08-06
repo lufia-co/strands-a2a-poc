@@ -1,6 +1,7 @@
 bedrock-agentcore
 strands-agents
 strands-agents[anthropic]
+strands-agents[otel]
 strands-agents-tools[a2a_client]
-uvicorn
+langfuse
 python-dotenv

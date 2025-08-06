@@ -3,3 +3,4 @@
 *test*.json
 .venv
 logs/
+gcp_build_and_push.sh

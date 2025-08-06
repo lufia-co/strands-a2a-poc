@@ -1,101 +1,98 @@
-import logging
+def patch_strands_a2a_executor():
+    # This runtime patch is needed as workaround until is fixed by -> https://github.com/strands-agents/sdk-python/issues/589
+    # ------- # ------- # ------- # ------- # ------- 
+    from strands.multiagent.a2a.executor import StrandsA2AExecutor
+    from a2a.server.tasks import TaskUpdater
+
+    # Patch the execute method to fix the contextId/context_id issue
+    original_execute = StrandsA2AExecutor.execute
+
+    async def patched_execute(self, context, event_queue):
+        """Patched execute method that fixes the contextId attribute error."""
+        task = context.current_task
+        if not task:
+            from a2a.utils import new_task
+            task = new_task(context.message)
+            await event_queue.enqueue_event(task)
+
+        # Fix: use context_id instead of contextId
+        updater = TaskUpdater(event_queue, task.id, task.context_id)
+
+        try:
+            await self._execute_streaming(context, updater)
+        except Exception as e:
+            from a2a.types import InternalError
+            from a2a.utils.errors import ServerError
+            raise ServerError(error=InternalError()) from e
+
+    # Apply the patch
+    StrandsA2AExecutor.execute = patched_execute
+    # ------- # ------- # ------- # ------- # ------- 
+
+patch_strands_a2a_executor()
+
 import os
+import uvicorn
+
 from dotenv import load_dotenv
-
-# This runtime patch is needed as workaround until is fixed by -> https://github.com/strands-agents/sdk-python/issues/589
-# ------- # ------- # ------- # ------- # -------
-import strands.multiagent.a2a.executor as executor_module
-from strands.multiagent.a2a.executor import StrandsA2AExecutor
-from a2a.server.tasks import TaskUpdater
-
-# Patch the execute method to fix the contextId/context_id issue
-original_execute = StrandsA2AExecutor.execute
-
-async def patched_execute(self, context, event_queue):
-    """Patched execute method that fixes the contextId attribute error."""
-    task = context.current_task
-    if not task:
-        from a2a.utils import new_task
-        task = new_task(context.message)
-        await event_queue.enqueue_event(task)
-
-    # Fix: use context_id instead of contextId
-    updater = TaskUpdater(event_queue, task.id, task.context_id)
-
-    try:
-        await self._execute_streaming(context, updater)
-    except Exception as e:
-        from a2a.types import InternalError
-        from a2a.utils.errors import ServerError
-        raise ServerError(error=InternalError()) from e
-
-# Apply the patch
-StrandsA2AExecutor.execute = patched_execute
-# ------- # ------- # ------- # ------- # -------
-
-from strands import Agent
+from strands import Agent, tool
 from strands.tools.mcp import MCPClient
 from strands.multiagent.a2a import A2AServer
 from mcp.client.streamable_http import streamablehttp_client
 from strands.models.bedrock import BedrockModel
-import uvicorn
 
-logging.basicConfig(level=logging.INFO)
-
+print("Loading environment variables...")
 load_dotenv()
 
-CONNECTION_ID = os.getenv('NANGO_CONNECTION_ID')
+print("Setting up MCP client...")
 SECRET_KEY = os.getenv('NANGO_SECRET_KEY')
+if not SECRET_KEY:
+    print("Error: NANGO_SECRET_KEY environment variable is not set.")
+    raise ValueError("NANGO_SECRET_KEY environment variable is not set.")
 
-if not CONNECTION_ID or not SECRET_KEY:
-    raise ValueError("NANGO_CONNECTION_ID or NANGO_SECRET_KEY environment variable is not set.")
-
-
-mcp_client = MCPClient(lambda: streamablehttp_client(
-    url="https://api.nango.dev/mcp",
-    headers={
-        "Authorization": f"Bearer {str(SECRET_KEY)}",
-        "connection-id": str(CONNECTION_ID),
-        "provider-config-key": "google-calendar"
-    }
-))
-
-
-try:
+@tool
+def nango_mcp_calendar_tools(connection_id: str):
+    mcp_client = MCPClient(lambda: streamablehttp_client(
+        url="https://api.nango.dev/mcp",
+        headers={
+            "Authorization": f"Bearer {str(SECRET_KEY)}",
+            "connection-id": connection_id,
+            "provider-config-key": "google-calendar"
+        }
+    ))
     mcp_client.start()
-    calendar_tools = mcp_client.list_tools_sync()
-except Exception as e:
-    raise RuntimeError(f"Failed to initialize MCP client: {e}")
+    print("MCP client started successfully.")
+    return mcp_client.list_tools_sync()
 
-
-model = BedrockModel(
-    model_id="anthropic.claude-3-haiku-20240307-v1:0",
-    temperature=0
-)
+print("Creating Google Calendar Agent...")
 google_calendar_agent = Agent(
-    model=model,
+    model=BedrockModel(model_id="anthropic.claude-3-haiku-20240307-v1:0", temperature=0),
     name="google-calendar-agent",
     agent_id="google-calendar-agent",
     description="Google Calendar Agent",
     system_prompt='''You are a connection agent that interacts with google-calendar via MCP client.
-    Use only the provided tools to retrieve information relation to user's google calendar. 
-    If none of the tools can help you, inform the user that you can not help with that.
+    Use only the provided tools to retrieve information related to the user's google calendar. 
+    If none of the tools can help you, inform the user that you cannot help with that.
     
     Important:
-    1. the default location for timezone is Sao Paulo, Brazil.
-    1.1. If the user does not specify a timezone, you can assume it's Sao Paulo.
-    2. If any exception happens, just inform the user you're not being able to retrieve data due to internal problems.
-    3. You can use current_time tool to clarify and define which day is today.
+    - The default location for timezone is Sao Paulo, Brazil.
+    - If the user does not specify a timezone, you can assume it's Sao Paulo.
+    - If any exception happens, just inform the user you're not being able to retrieve data due to internal problems.
+    - Forward the connection_id to nango_mcp_calendar_tools.
+    - If no connection_id is provided, inform that you cannot perform the operation and ask the user to inform the connection_id.
 
     Always answer with a JSON object
     DO NOT use emojis in the answers
     ''',
     record_direct_tool_call=False,
-    tools=calendar_tools,
+    tools=[nango_mcp_calendar_tools],
 )
 
-server = A2AServer(agent=google_calendar_agent)
+print("Creating A2A Server...")
+server_url = os.getenv("CALENDAR_AGENT_URL", "http://localhost:8080") # Ensure this is set in your environment so load_balancer, cloud_run, or other services can access it.
+server = A2AServer(agent=google_calendar_agent, serve_at_root=True, http_url=server_url)
+
+print("Converting A2A Server to FastAPI app...")
 fastapi_app = server.to_fastapi_app()
 
-uvicorn.run(fastapi_app, host="0.0.0.0", port=9000)
-
+uvicorn.run(fastapi_app, host="0.0.0.0", port=8080)
