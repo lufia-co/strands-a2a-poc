@@ -24,9 +24,9 @@ app = FastAPI(
 langfuse = get_client()
 
 
-google_calendar_agent_url = os.getenv("CLOUD_RUN_CALENDAR_AGENT_URL")
-if not google_calendar_agent_url:
-    raise ValueError("CLOUD_RUN_CALENDAR_AGENT_URL environment variable is not set.")
+# Leave CALENDAR_AGENT_URL empty if you want to use the default localhost:8080
+# You need to run nango-caller-agent.py first to have the agent running
+google_calendar_agent_url = os.getenv("CALENDAR_AGENT_URL", "http://localhost:8080")
 provider = A2AClientToolProvider(known_agent_urls=[google_calendar_agent_url])
 
 model = BedrockModel(temperature=0)

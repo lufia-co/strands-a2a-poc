@@ -45,12 +45,10 @@ print("Loading environment variables...")
 load_dotenv()
 
 print("Setting up MCP client...")
-CONNECTION_ID = os.getenv('NANGO_CONNECTION_ID')
 SECRET_KEY = os.getenv('NANGO_SECRET_KEY')
-
-if not CONNECTION_ID or not SECRET_KEY:
-    print("Error: NANGO_CONNECTION_ID or NANGO_SECRET_KEY environment variable is not set.")
-    raise ValueError("NANGO_CONNECTION_ID or NANGO_SECRET_KEY environment variable is not set.")
+if not SECRET_KEY:
+    print("Error: NANGO_SECRET_KEY environment variable is not set.")
+    raise ValueError("NANGO_SECRET_KEY environment variable is not set.")
 
 @tool
 def nango_mcp_calendar_tools(connection_id: str):
@@ -91,7 +89,7 @@ google_calendar_agent = Agent(
 )
 
 print("Creating A2A Server...")
-server_url = os.getenv("SERVER_URL") # Ensure this is set in your environment so load_balancer, cloud_run, or other services can access it.
+server_url = os.getenv("CALENDAR_AGENT_URL", "http://localhost:8080") # Ensure this is set in your environment so load_balancer, cloud_run, or other services can access it.
 server = A2AServer(agent=google_calendar_agent, serve_at_root=True, http_url=server_url)
 
 print("Converting A2A Server to FastAPI app...")
