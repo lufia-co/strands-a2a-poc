@@ -9,7 +9,7 @@ from strands_tools.a2a_client import A2AClientToolProvider
 load_dotenv()
 
 model = BedrockModel(temperature=0)
-provider = A2AClientToolProvider(known_agent_urls=["http://localhost:9000/"])
+provider = A2AClientToolProvider(known_agent_urls=["https://nwqkhmf2psxytdcdjdq7iklddq0xgsxx.lambda-url.us-east-1.on.aws/"])
 
 qna_agent = Agent(
     system_prompt='''

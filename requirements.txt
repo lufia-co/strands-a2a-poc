@@ -4,3 +4,8 @@ strands-agents[anthropic]
 strands-agents-tools[a2a_client]
 uvicorn
 python-dotenv
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+opentelemetry-instrumentation
+langfuse
+mangum
